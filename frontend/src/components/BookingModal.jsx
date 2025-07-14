@@ -200,13 +200,14 @@ const BookingModal = ({ isOpen, onClose, preSelectedService }) => {
         const data = await response.json()
         setVerificationSession(data)
         
-        // For simplified verification, automatically proceed to completion
-        if (data.status === 'verified') {
-          setVerificationStep('complete')
-          setBookingResponse({ success: true, message: 'Booking submitted successfully!' })
+        // Open Stripe Identity verification in new window
+        if (data.url) {
+          window.open(data.url, '_blank', 'width=600,height=800')
         }
         
         return data
+      } else {
+        console.error('Failed to create verification session:', response.status)
       }
     } catch (error) {
       console.error('Error creating verification session:', error)
