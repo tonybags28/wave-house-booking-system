@@ -199,8 +199,13 @@ const BookingModal = ({ isOpen, onClose, preSelectedService }) => {
       if (response.ok) {
         const data = await response.json()
         setVerificationSession(data)
-        // Open Stripe Identity verification in new window
-        window.open(data.url, '_blank', 'width=600,height=800')
+        
+        // For simplified verification, automatically proceed to completion
+        if (data.status === 'verified') {
+          setVerificationStep('complete')
+          setBookingResponse({ success: true, message: 'Booking submitted successfully!' })
+        }
+        
         return data
       }
     } catch (error) {
