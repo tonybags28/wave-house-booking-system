@@ -14,6 +14,61 @@ from src.routes.admin import admin_bp
 from src.routes.payment import payment_bp
 from src.routes.verification import verification_bp
 
+# Import database initialization
+import psycopg2
+from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
+
+def initialize_database():
+    """Initialize database tables for Wave House booking system"""
+    database_url = os.environ.get('DATABASE_URL')
+    if not database_url:
+        print("No DATABASE_URL found, skipping database initialization")
+        return
+    
+    try:
+        print("🚀 Initializing Wave House database tables...")
+        conn = psycopg2.connect(database_url)
+        conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
+        cursor = conn.cursor()
+        
+        # Create bookings table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS bookings (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(255) NOT NULL,
+                email VARCHAR(255) NOT NULL,
+                phone VARCHAR(50),
+                project_type VARCHAR(100),
+                booking_date DATE NOT NULL,
+                booking_time TIME NOT NULL,
+                duration INTEGER DEFAULT 4,
+                service_type VARCHAR(50) NOT NULL,
+                additional_info TEXT,
+                status VARCHAR(50) DEFAULT 'pending',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+        
+        # Create contact_messages table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS contact_messages (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(255) NOT NULL,
+                email VARCHAR(255) NOT NULL,
+                message TEXT NOT NULL,
+                status VARCHAR(50) DEFAULT 'unread',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+        
+        cursor.close()
+        conn.close()
+        print("✅ Wave House database tables initialized successfully!")
+        
+    except Exception as e:
+        print(f"❌ Error initializing database: {e}")
+
 app = Flask(__name__, static_folder=os.path.join(os.path.dirname(__file__), 'static'))
 app.config['SECRET_KEY'] = 'asdf#FGSgvasgf$5$WGT'
 
@@ -43,6 +98,9 @@ db.init_app(app)
 with app.app_context():
     db.create_all()
     print("Database tables created successfully")  # Debug logging
+    
+    # Initialize Wave House specific tables
+    initialize_database()
 
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
