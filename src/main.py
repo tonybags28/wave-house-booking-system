@@ -13,6 +13,7 @@ from src.routes.booking import booking_bp
 from src.routes.admin import admin_bp
 from src.routes.payment import payment_bp
 from src.routes.verification import verification_bp
+from src.routes.simple_booking import simple_booking_bp
 
 # Import database initialization
 import psycopg2
@@ -77,6 +78,7 @@ CORS(app)
 
 app.register_blueprint(user_bp, url_prefix='/api')
 app.register_blueprint(booking_bp, url_prefix='/api')
+app.register_blueprint(simple_booking_bp, url_prefix='/api')
 app.register_blueprint(admin_bp)
 app.register_blueprint(payment_bp)
 app.register_blueprint(verification_bp)
