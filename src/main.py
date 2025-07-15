@@ -105,6 +105,28 @@ with app.app_context():
     # Initialize Wave House specific tables
     initialize_database()
 
+@app.route('/api/blocked-slots')
+def get_blocked_slots():
+    """Get all blocked time slots for frontend booking calendar integration"""
+    from flask import jsonify
+    from datetime import datetime
+    
+    try:
+        blocked_slots = BlockedSlot.query.all()
+        blocked_slots_data = []
+        
+        for slot in blocked_slots:
+            blocked_slots_data.append({
+                'date': slot.date.strftime('%Y-%m-%d'),
+                'time': slot.time.strftime('%H:%M'),
+                'reason': slot.reason or 'Blocked'
+            })
+        
+        return jsonify(blocked_slots_data)
+    except Exception as e:
+        print(f"Error fetching blocked slots: {e}")
+        return jsonify([])
+
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
 def serve(path):
