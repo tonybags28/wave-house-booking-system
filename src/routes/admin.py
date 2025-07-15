@@ -6,6 +6,11 @@ from datetime import datetime
 
 admin_bp = Blueprint('admin', __name__)
 
+# Simple test route to verify blueprint is working
+@admin_bp.route('/admin/test')
+def admin_test():
+    return "Admin blueprint is working!"
+
 # Admin password - change this to something secure
 ADMIN_PASSWORD = "admin123"
 
