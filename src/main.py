@@ -110,87 +110,235 @@ with app.app_context():
 
 @app.route('/admin')
 def admin():
-    """Simple admin interface"""
-    admin_html = """
+    """Comprehensive admin dashboard"""
+    from src.models.booking import Booking, BlockedSlot
+    from src.models.client import Client
+    from datetime import datetime
+    
+    try:
+        # Get all bookings
+        bookings = Booking.query.order_by(Booking.created_at.desc()).all()
+        
+        # Get all blocked slots
+        blocked_slots = BlockedSlot.query.order_by(BlockedSlot.date, BlockedSlot.time).all()
+        
+        # Get stats
+        total_bookings = len(bookings)
+        pending_bookings = len([b for b in bookings if b.status == 'pending'])
+        confirmed_bookings = len([b for b in bookings if b.status == 'confirmed'])
+        total_blocked = len(blocked_slots)
+        
+    except Exception as e:
+        print(f"Database error: {e}")
+        bookings = []
+        blocked_slots = []
+        total_bookings = pending_bookings = confirmed_bookings = total_blocked = 0
+    
+    admin_html = f"""
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Wave House Admin</title>
+    <title>Wave House Admin Dashboard</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { 
+        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+        body {{ 
             font-family: Arial, sans-serif; 
             background: #1a1a1a; 
             color: white; 
             min-height: 100vh;
             padding: 20px;
-        }
-        .container { max-width: 1200px; margin: 0 auto; }
-        .header { 
+        }}
+        .container {{ max-width: 1400px; margin: 0 auto; }}
+        .header {{ 
             background: linear-gradient(135deg, #00bcd4, #0097a7);
             padding: 20px;
             border-radius: 10px;
             margin-bottom: 30px;
             text-align: center;
-        }
-        .admin-content {
+        }}
+        .stats {{
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }}
+        .stat-card {{
             background: #2a2a2a;
-            padding: 30px;
+            padding: 20px;
             border-radius: 10px;
             text-align: center;
-        }
-        .btn {
+        }}
+        .stat-number {{
+            font-size: 2.5em;
+            color: #00bcd4;
+            font-weight: bold;
+        }}
+        .section {{
+            background: #2a2a2a;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }}
+        .section h2 {{
+            color: #00bcd4;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #00bcd4;
+            padding-bottom: 10px;
+        }}
+        .booking-item {{
+            background: #333;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr auto;
+            gap: 15px;
+            align-items: center;
+        }}
+        .booking-pending {{ border-left: 4px solid #ff9800; }}
+        .booking-confirmed {{ border-left: 4px solid #4caf50; }}
+        .booking-cancelled {{ border-left: 4px solid #f44336; }}
+        .btn {{
             background: #00bcd4;
             color: white;
-            padding: 15px 30px;
+            padding: 8px 16px;
             border: none;
             border-radius: 5px;
             cursor: pointer;
-            margin: 10px;
             text-decoration: none;
             display: inline-block;
-            font-size: 16px;
-        }
-        .btn:hover { background: #0097a7; }
-        .info {
-            background: #333;
-            padding: 20px;
-            border-radius: 8px;
-            margin: 20px 0;
-        }
+            font-size: 14px;
+            margin: 2px;
+        }}
+        .btn:hover {{ background: #0097a7; }}
+        .btn-success {{ background: #4caf50; }}
+        .btn-success:hover {{ background: #45a049; }}
+        .btn-danger {{ background: #f44336; }}
+        .btn-danger:hover {{ background: #d32f2f; }}
+        .blocked-slot {{
+            background: #444;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 5px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }}
+        .status-pending {{ color: #ff9800; }}
+        .status-confirmed {{ color: #4caf50; }}
+        .status-cancelled {{ color: #f44336; }}
+        .no-data {{
+            text-align: center;
+            color: #666;
+            padding: 40px;
+        }}
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>🎵 Wave House Admin</h1>
-            <p>Admin Dashboard</p>
+            <h1>🎵 Wave House Admin Dashboard</h1>
+            <p>Complete Booking Management System</p>
         </div>
         
-        <div class="admin-content">
-            <h2>Admin Access Confirmed!</h2>
-            <p style="margin: 20px 0;">The admin interface is working. Use the Python tool for full blocked slots management.</p>
-            
-            <div class="info">
-                <h3>Blocked Slots Management</h3>
-                <p>To manage your blocked time slots, use the Python tool provided:</p>
-                <code style="background: #1a1a1a; padding: 10px; display: block; margin: 10px 0; border-radius: 5px;">
-                    python3 blocked_slots_manager.py
-                </code>
-                <p>This tool provides full functionality to:</p>
-                <ul style="text-align: left; margin: 10px 0; padding-left: 20px;">
-                    <li>View all 1079 blocked slots</li>
-                    <li>Delete individual time slots</li>
-                    <li>Delete all slots for specific dates</li>
-                    <li>Delete date ranges (perfect for when your client leaves town)</li>
-                </ul>
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-number">{total_bookings}</div>
+                <div>Total Bookings</div>
             </div>
-            
+            <div class="stat-card">
+                <div class="stat-number">{pending_bookings}</div>
+                <div>Pending Bookings</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">{confirmed_bookings}</div>
+                <div>Confirmed Bookings</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">{total_blocked}</div>
+                <div>Blocked Slots</div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>📅 Recent Bookings</h2>
+            {"".join([f'''
+            <div class="booking-item booking-{booking.status}">
+                <div>
+                    <strong>{booking.name}</strong><br>
+                    <small>{booking.email}</small>
+                </div>
+                <div>
+                    {booking.booking_date} at {booking.booking_time}<br>
+                    <small>{booking.service_type} - {booking.duration}hrs</small>
+                </div>
+                <div>
+                    <span class="status-{booking.status}">●</span> {booking.status.title()}
+                </div>
+                <div>
+                    <button class="btn btn-success" onclick="updateBooking({booking.id}, 'confirmed')">Confirm</button>
+                    <button class="btn btn-danger" onclick="updateBooking({booking.id}, 'cancelled')">Cancel</button>
+                </div>
+            </div>
+            ''' for booking in bookings[:10]]) if bookings else '<div class="no-data">No bookings found</div>'}
+        </div>
+
+        <div class="section">
+            <h2>🚫 Blocked Time Slots</h2>
+            <p style="margin-bottom: 15px;">Manage blocked time slots for your monthly client</p>
+            {"".join([f'''
+            <div class="blocked-slot">
+                <span>{slot.date} at {slot.time}</span>
+                <button class="btn btn-danger" onclick="deleteBlockedSlot({slot.id})">Remove</button>
+            </div>
+            ''' for slot in blocked_slots[:20]]) if blocked_slots else '<div class="no-data">No blocked slots found</div>'}
+            {f'<p style="margin-top: 15px; color: #666;">Showing 20 of {total_blocked} blocked slots</p>' if total_blocked > 20 else ''}
+        </div>
+
+        <div style="text-align: center; margin-top: 30px;">
             <a href="/" class="btn">Back to Main Site</a>
+            <a href="/admin-access" class="btn">Advanced Admin</a>
         </div>
     </div>
+
+    <script>
+        function updateBooking(bookingId, status) {{
+            if (confirm(`Are you sure you want to ${{status}} this booking?`)) {{
+                fetch('/api/admin/booking/' + bookingId, {{
+                    method: 'PUT',
+                    headers: {{'Content-Type': 'application/json'}},
+                    body: JSON.stringify({{status: status}})
+                }})
+                .then(response => response.json())
+                .then(data => {{
+                    if (data.success) {{
+                        location.reload();
+                    }} else {{
+                        alert('Error: ' + data.error);
+                    }}
+                }});
+            }}
+        }}
+
+        function deleteBlockedSlot(slotId) {{
+            if (confirm('Remove this blocked time slot?')) {{
+                fetch('/api/admin/blocked-slot/' + slotId, {{
+                    method: 'DELETE',
+                    headers: {{'Content-Type': 'application/json'}}
+                }})
+                .then(response => response.json())
+                .then(data => {{
+                    if (data.success) {{
+                        location.reload();
+                    }} else {{
+                        alert('Error: ' + data.error);
+                    }}
+                }});
+            }}
+        }}
+    </script>
 </body>
 </html>
     """
