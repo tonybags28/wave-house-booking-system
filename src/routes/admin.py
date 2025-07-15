@@ -108,13 +108,34 @@ ADMIN_TEMPLATE = """
         .booking.pending { border-left: 4px solid #ffa500; }
         .booking.confirmed { border-left: 4px solid #00ff00; }
         .booking.cancelled { border-left: 4px solid #ff0000; }
+        .blocked-slot { background: #3a2a2a; padding: 15px; margin: 10px 0; border-radius: 8px; border-left: 4px solid #ff6600; }
         button { padding: 8px 16px; margin: 5px; border: none; border-radius: 4px; cursor: pointer; }
         .confirm { background: #00aa00; color: white; }
         .cancel { background: #aa0000; color: white; }
         .delete { background: #666; color: white; }
+        .block-btn { background: #ff6600; color: white; }
         h1, h2 { color: #00ffff; }
         .stats { display: flex; gap: 20px; margin: 20px 0; }
         .stat { background: #333; padding: 15px; border-radius: 8px; text-align: center; }
+        .bulk-block-form { background: #2a2a2a; padding: 20px; margin: 20px 0; border-radius: 8px; }
+        .form-group { margin: 15px 0; }
+        .form-group label { display: block; margin-bottom: 5px; color: #00ffff; }
+        .form-group input, .form-group select, .form-group textarea { 
+            width: 100%; padding: 10px; border: 1px solid #555; border-radius: 4px; 
+            background: #333; color: white; box-sizing: border-box; 
+        }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+            outline: none; border-color: #00ffff;
+        }
+        .time-slots { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin: 10px 0; }
+        .time-slot { background: #333; padding: 8px; border-radius: 4px; text-align: center; cursor: pointer; border: 2px solid transparent; }
+        .time-slot:hover { border-color: #00ffff; }
+        .time-slot.selected { background: #ff6600; border-color: #ff6600; }
+        .tabs { display: flex; margin: 20px 0; }
+        .tab { padding: 10px 20px; background: #333; border: none; color: white; cursor: pointer; margin-right: 5px; border-radius: 4px 4px 0 0; }
+        .tab.active { background: #00ffff; color: #1a1a1a; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
     </style>
 </head>
 <body>
@@ -134,33 +155,221 @@ ADMIN_TEMPLATE = """
                 <h3>Confirmed</h3>
                 <p id="confirmed-bookings">{{ confirmed_bookings }}</p>
             </div>
+            <div class="stat">
+                <h3>Blocked Slots</h3>
+                <p id="blocked-slots">{{ blocked_slots_count }}</p>
+            </div>
         </div>
 
-        <h2>Booking Requests</h2>
-        <div id="bookings">
-            {% for booking in bookings %}
-            <div class="booking {{ booking.status }}" id="booking-{{ booking.id }}">
-                <h3>{{ booking.name }} - {{ booking.service_type }}</h3>
-                <p><strong>Date:</strong> {{ booking.date }} at {{ booking.time }}</p>
-                <p><strong>Duration:</strong> {{ booking.duration or 'N/A' }}</p>
-                <p><strong>Email:</strong> {{ booking.email }}</p>
-                <p><strong>Phone:</strong> {{ booking.phone or 'N/A' }}</p>
-                <p><strong>Project:</strong> {{ booking.project_type or 'N/A' }}</p>
-                <p><strong>Message:</strong> {{ booking.message or 'N/A' }}</p>
-                <p><strong>Status:</strong> {{ booking.status }}</p>
-                <p><strong>Created:</strong> {{ booking.created_at }}</p>
-                
-                {% if booking.status == 'pending' %}
-                <button class="confirm" onclick="updateStatus({{ booking.id }}, 'confirmed')">Confirm Booking</button>
-                <button class="cancel" onclick="updateStatus({{ booking.id }}, 'cancelled')">Cancel Booking</button>
-                {% endif %}
-                <button class="delete" onclick="deleteBooking({{ booking.id }})">Delete</button>
+        <div class="tabs">
+            <button class="tab active" onclick="showTab('bookings')">Booking Requests</button>
+            <button class="tab" onclick="showTab('blocking')">Bulk Block Times</button>
+            <button class="tab" onclick="showTab('blocked-slots')">Manage Blocked Slots</button>
+        </div>
+
+        <div id="bookings" class="tab-content active">
+            <h2>Booking Requests</h2>
+            <div id="bookings-list">
+                {% for booking in bookings %}
+                <div class="booking {{ booking.status }}" id="booking-{{ booking.id }}">
+                    <h3>{{ booking.name }} - {{ booking.service_type }}</h3>
+                    <p><strong>Date:</strong> {{ booking.date }} at {{ booking.time }}</p>
+                    <p><strong>Duration:</strong> {{ booking.duration or 'N/A' }}</p>
+                    <p><strong>Email:</strong> {{ booking.email }}</p>
+                    <p><strong>Phone:</strong> {{ booking.phone or 'N/A' }}</p>
+                    <p><strong>Project:</strong> {{ booking.project_type or 'N/A' }}</p>
+                    <p><strong>Message:</strong> {{ booking.message or 'N/A' }}</p>
+                    <p><strong>Status:</strong> {{ booking.status }}</p>
+                    <p><strong>Created:</strong> {{ booking.created_at }}</p>
+                    
+                    {% if booking.status == 'pending' %}
+                    <button class="confirm" onclick="updateStatus({{ booking.id }}, 'confirmed')">Confirm Booking</button>
+                    <button class="cancel" onclick="updateStatus({{ booking.id }}, 'cancelled')">Cancel Booking</button>
+                    {% endif %}
+                    <button class="delete" onclick="deleteBooking({{ booking.id }})">Delete</button>
+                </div>
+                {% endfor %}
             </div>
-            {% endfor %}
+        </div>
+
+        <div id="blocking" class="tab-content">
+            <h2>Bulk Block Time Slots</h2>
+            <div class="bulk-block-form">
+                <form id="bulk-block-form">
+                    <div class="form-group">
+                        <label for="start-date">Start Date:</label>
+                        <input type="date" id="start-date" name="start_date" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="end-date">End Date:</label>
+                        <input type="date" id="end-date" name="end_date" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Select Days of Week:</label>
+                        <div style="display: flex; gap: 10px; margin: 10px 0;">
+                            <label><input type="checkbox" name="days" value="0" checked> Sunday</label>
+                            <label><input type="checkbox" name="days" value="1" checked> Monday</label>
+                            <label><input type="checkbox" name="days" value="2" checked> Tuesday</label>
+                            <label><input type="checkbox" name="days" value="3" checked> Wednesday</label>
+                            <label><input type="checkbox" name="days" value="4" checked> Thursday</label>
+                            <label><input type="checkbox" name="days" value="5" checked> Friday</label>
+                            <label><input type="checkbox" name="days" value="6" checked> Saturday</label>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Select Time Slots to Block:</label>
+                        <div class="time-slots" id="time-slots">
+                            <!-- Time slots will be generated by JavaScript -->
+                        </div>
+                        <button type="button" onclick="selectAllTimes()">Select All</button>
+                        <button type="button" onclick="selectNightHours()">Select Night Hours (10PM-6AM)</button>
+                        <button type="button" onclick="clearTimeSelection()">Clear Selection</button>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="reason">Reason for Blocking:</label>
+                        <input type="text" id="reason" name="reason" placeholder="e.g., Monthly client rental, Maintenance, Holiday" required>
+                    </div>
+                    
+                    <button type="submit" class="block-btn">Block Selected Time Slots</button>
+                </form>
+            </div>
+        </div>
+
+        <div id="blocked-slots" class="tab-content">
+            <h2>Manage Blocked Slots</h2>
+            <div id="blocked-slots-list">
+                {% for slot in blocked_slots %}
+                <div class="blocked-slot" id="blocked-slot-{{ slot.id }}">
+                    <h3>{{ slot.date }} at {{ slot.time }}</h3>
+                    <p><strong>Reason:</strong> {{ slot.reason or 'No reason specified' }}</p>
+                    <p><strong>Created:</strong> {{ slot.created_at }}</p>
+                    <button class="delete" onclick="deleteBlockedSlot({{ slot.id }})">Remove Block</button>
+                </div>
+                {% endfor %}
+            </div>
         </div>
     </div>
 
     <script>
+        // Tab functionality
+        function showTab(tabName) {
+            // Hide all tab contents
+            const tabContents = document.querySelectorAll('.tab-content');
+            tabContents.forEach(content => content.classList.remove('active'));
+            
+            // Remove active class from all tabs
+            const tabs = document.querySelectorAll('.tab');
+            tabs.forEach(tab => tab.classList.remove('active'));
+            
+            // Show selected tab content
+            document.getElementById(tabName).classList.add('active');
+            
+            // Add active class to clicked tab
+            event.target.classList.add('active');
+        }
+
+        // Generate time slots
+        function generateTimeSlots() {
+            const timeSlotsContainer = document.getElementById('time-slots');
+            const times = [];
+            
+            // Generate 24-hour time slots
+            for (let hour = 0; hour < 24; hour++) {
+                const time12 = hour === 0 ? '12:00 AM' : 
+                              hour < 12 ? `${hour}:00 AM` : 
+                              hour === 12 ? '12:00 PM' : 
+                              `${hour - 12}:00 PM`;
+                const time24 = `${hour.toString().padStart(2, '0')}:00`;
+                times.push({ display: time12, value: time24 });
+            }
+            
+            times.forEach(time => {
+                const slot = document.createElement('div');
+                slot.className = 'time-slot';
+                slot.textContent = time.display;
+                slot.dataset.time = time.value;
+                slot.onclick = () => toggleTimeSlot(slot);
+                timeSlotsContainer.appendChild(slot);
+            });
+        }
+
+        function toggleTimeSlot(slot) {
+            slot.classList.toggle('selected');
+        }
+
+        function selectAllTimes() {
+            const slots = document.querySelectorAll('.time-slot');
+            slots.forEach(slot => slot.classList.add('selected'));
+        }
+
+        function selectNightHours() {
+            clearTimeSelection();
+            const slots = document.querySelectorAll('.time-slot');
+            slots.forEach(slot => {
+                const hour = parseInt(slot.dataset.time.split(':')[0]);
+                if (hour >= 22 || hour < 6) { // 10PM to 6AM
+                    slot.classList.add('selected');
+                }
+            });
+        }
+
+        function clearTimeSelection() {
+            const slots = document.querySelectorAll('.time-slot');
+            slots.forEach(slot => slot.classList.remove('selected'));
+        }
+
+        // Form submission
+        document.getElementById('bulk-block-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const selectedTimes = Array.from(document.querySelectorAll('.time-slot.selected'))
+                                      .map(slot => slot.dataset.time);
+            const selectedDays = Array.from(document.querySelectorAll('input[name="days"]:checked'))
+                                     .map(input => parseInt(input.value));
+            
+            if (selectedTimes.length === 0) {
+                alert('Please select at least one time slot to block.');
+                return;
+            }
+            
+            if (selectedDays.length === 0) {
+                alert('Please select at least one day of the week.');
+                return;
+            }
+            
+            const data = {
+                start_date: formData.get('start_date'),
+                end_date: formData.get('end_date'),
+                days: selectedDays,
+                times: selectedTimes,
+                reason: formData.get('reason')
+            };
+            
+            fetch('/admin/bulk-block', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert('Error: ' + data.error);
+                } else {
+                    alert(`Successfully blocked ${data.blocked_count} time slots!`);
+                    location.reload();
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error blocking time slots');
+            });
+        });
+
         function updateStatus(bookingId, status) {
             fetch(`/admin/bookings/${bookingId}`, {
                 method: 'PUT',
@@ -200,6 +409,39 @@ ADMIN_TEMPLATE = """
                 });
             }
         }
+
+        function deleteBlockedSlot(slotId) {
+            if (confirm('Are you sure you want to remove this blocked time slot?')) {
+                fetch(`/admin/blocked-slots/${slotId}`, {
+                    method: 'DELETE'
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        alert('Error: ' + data.error);
+                    } else {
+                        location.reload();
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Error deleting blocked slot');
+                });
+            }
+        }
+
+        // Initialize time slots when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            generateTimeSlots();
+            
+            // Set default dates (today and 3 months from now)
+            const today = new Date();
+            const threeMonthsLater = new Date(today);
+            threeMonthsLater.setMonth(threeMonthsLater.getMonth() + 3);
+            
+            document.getElementById('start-date').value = today.toISOString().split('T')[0];
+            document.getElementById('end-date').value = threeMonthsLater.toISOString().split('T')[0];
+        });
     </script>
 </body>
 </html>
@@ -234,16 +476,20 @@ def admin_dashboard_view():
     """Display the actual admin dashboard"""
     try:
         bookings = Booking.query.order_by(Booking.created_at.desc()).all()
+        blocked_slots = BlockedSlot.query.order_by(BlockedSlot.date.desc(), BlockedSlot.time.desc()).all()
         
         total_bookings = len(bookings)
         pending_bookings = len([b for b in bookings if b.status == 'pending'])
         confirmed_bookings = len([b for b in bookings if b.status == 'confirmed'])
+        blocked_slots_count = len(blocked_slots)
         
         return render_template_string(ADMIN_TEMPLATE, 
                                     bookings=bookings,
+                                    blocked_slots=blocked_slots,
                                     total_bookings=total_bookings,
                                     pending_bookings=pending_bookings,
-                                    confirmed_bookings=confirmed_bookings)
+                                    confirmed_bookings=confirmed_bookings,
+                                    blocked_slots_count=blocked_slots_count)
     except Exception as e:
         return f"Error: {str(e)}", 500
 
@@ -279,6 +525,80 @@ def delete_booking_admin(booking_id):
         db.session.commit()
         
         return jsonify({'message': 'Booking deleted successfully'})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@admin_bp.route('/admin/bulk-block', methods=['POST'])
+@cross_origin()
+def bulk_block_slots():
+    """Bulk block time slots"""
+    try:
+        data = request.get_json()
+        
+        start_date = datetime.strptime(data['start_date'], '%Y-%m-%d').date()
+        end_date = datetime.strptime(data['end_date'], '%Y-%m-%d').date()
+        selected_days = data['days']  # List of weekday numbers (0=Sunday, 6=Saturday)
+        selected_times = data['times']  # List of time strings like "22:00"
+        reason = data['reason']
+        
+        blocked_count = 0
+        current_date = start_date
+        
+        while current_date <= end_date:
+            # Check if this date's weekday is in the selected days
+            if current_date.weekday() == 6:  # Python weekday: Monday=0, Sunday=6
+                weekday_num = 0  # Convert to our format: Sunday=0
+            else:
+                weekday_num = current_date.weekday() + 1  # Monday=1, Saturday=6
+            
+            if weekday_num in selected_days:
+                # Block all selected times for this date
+                for time_str in selected_times:
+                    # Check if this slot is already blocked
+                    existing_block = BlockedSlot.query.filter_by(
+                        date=current_date,
+                        time=time_str
+                    ).first()
+                    
+                    if not existing_block:
+                        # Create new blocked slot
+                        blocked_slot = BlockedSlot(
+                            date=current_date,
+                            time=time_str,
+                            reason=reason
+                        )
+                        db.session.add(blocked_slot)
+                        blocked_count += 1
+            
+            # Move to next day
+            current_date = current_date.replace(day=current_date.day + 1) if current_date.day < 28 else \
+                          current_date.replace(month=current_date.month + 1, day=1) if current_date.month < 12 else \
+                          current_date.replace(year=current_date.year + 1, month=1, day=1)
+            
+            # Safety check to prevent infinite loop
+            if current_date.year > end_date.year + 1:
+                break
+        
+        db.session.commit()
+        return jsonify({'message': f'Successfully blocked {blocked_count} time slots', 'blocked_count': blocked_count})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@admin_bp.route('/admin/blocked-slots/<int:slot_id>', methods=['DELETE'])
+@cross_origin()
+def delete_blocked_slot(slot_id):
+    """Delete a blocked slot"""
+    try:
+        blocked_slot = BlockedSlot.query.get_or_404(slot_id)
+        db.session.delete(blocked_slot)
+        db.session.commit()
+        
+        return jsonify({'message': 'Blocked slot removed successfully'})
         
     except Exception as e:
         db.session.rollback()
