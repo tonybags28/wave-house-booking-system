@@ -14,6 +14,7 @@ from src.routes.admin import admin_bp
 from src.routes.payment import payment_bp
 from src.routes.verification import verification_bp
 from src.routes.simple_booking import simple_booking_bp
+from src.routes.direct_admin import direct_admin_bp
 
 # Import database initialization
 import psycopg2
@@ -78,6 +79,7 @@ CORS(app, origins=['*'], methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
      allow_headers=['Content-Type', 'Authorization'], supports_credentials=True)
 
 # Register blueprints BEFORE catch-all route to ensure proper routing
+app.register_blueprint(direct_admin_bp)  # Register direct admin first for immediate access
 app.register_blueprint(admin_bp)  # Register admin first to avoid conflicts
 app.register_blueprint(user_bp, url_prefix='/api')
 app.register_blueprint(booking_bp, url_prefix='/api')
