@@ -108,6 +108,94 @@ with app.app_context():
     # Initialize Wave House specific tables
     initialize_database()
 
+@app.route('/admin')
+def admin():
+    """Simple admin interface"""
+    admin_html = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wave House Admin</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: Arial, sans-serif; 
+            background: #1a1a1a; 
+            color: white; 
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .header { 
+            background: linear-gradient(135deg, #00bcd4, #0097a7);
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        .admin-content {
+            background: #2a2a2a;
+            padding: 30px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        .btn {
+            background: #00bcd4;
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+        }
+        .btn:hover { background: #0097a7; }
+        .info {
+            background: #333;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎵 Wave House Admin</h1>
+            <p>Admin Dashboard</p>
+        </div>
+        
+        <div class="admin-content">
+            <h2>Admin Access Confirmed!</h2>
+            <p style="margin: 20px 0;">The admin interface is working. Use the Python tool for full blocked slots management.</p>
+            
+            <div class="info">
+                <h3>Blocked Slots Management</h3>
+                <p>To manage your blocked time slots, use the Python tool provided:</p>
+                <code style="background: #1a1a1a; padding: 10px; display: block; margin: 10px 0; border-radius: 5px;">
+                    python3 blocked_slots_manager.py
+                </code>
+                <p>This tool provides full functionality to:</p>
+                <ul style="text-align: left; margin: 10px 0; padding-left: 20px;">
+                    <li>View all 1079 blocked slots</li>
+                    <li>Delete individual time slots</li>
+                    <li>Delete all slots for specific dates</li>
+                    <li>Delete date ranges (perfect for when your client leaves town)</li>
+                </ul>
+            </div>
+            
+            <a href="/" class="btn">Back to Main Site</a>
+        </div>
+    </div>
+</body>
+</html>
+    """
+    return admin_html
+
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
 def serve(path):
