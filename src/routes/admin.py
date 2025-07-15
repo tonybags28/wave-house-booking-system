@@ -633,3 +633,100 @@ def get_blocked_slots():
         print(f"Error fetching blocked slots: {e}")
         return jsonify({}), 500
 
+
+
+# API endpoints for static admin interface
+@admin_bp.route('/api/bookings', methods=['GET'])
+@cross_origin()
+def get_all_bookings():
+    """Get all bookings for admin dashboard"""
+    try:
+        bookings = Booking.query.order_by(Booking.created_at.desc()).all()
+        bookings_data = []
+        
+        for booking in bookings:
+            bookings_data.append({
+                'id': booking.id,
+                'name': booking.name,
+                'email': booking.email,
+                'phone': booking.phone,
+                'booking_date': booking.booking_date.strftime('%Y-%m-%d') if booking.booking_date else '',
+                'booking_time': booking.booking_time.strftime('%H:%M') if booking.booking_time else '',
+                'service_type': booking.service_type,
+                'duration': booking.duration,
+                'status': booking.status,
+                'created_at': booking.created_at.strftime('%Y-%m-%d %H:%M:%S') if booking.created_at else ''
+            })
+        
+        return jsonify(bookings_data)
+        
+    except Exception as e:
+        print(f"Error getting bookings: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@admin_bp.route('/api/blocked-slots', methods=['GET'])
+@cross_origin()
+def get_all_blocked_slots():
+    """Get all blocked slots for admin dashboard"""
+    try:
+        blocked_slots = BlockedSlot.query.order_by(BlockedSlot.date, BlockedSlot.time).all()
+        slots_data = []
+        
+        for slot in blocked_slots:
+            slots_data.append({
+                'id': slot.id,
+                'date': slot.date.strftime('%Y-%m-%d') if slot.date else '',
+                'time': slot.time.strftime('%H:%M') if slot.time else '',
+                'created_at': slot.created_at.strftime('%Y-%m-%d %H:%M:%S') if slot.created_at else ''
+            })
+        
+        return jsonify(slots_data)
+        
+    except Exception as e:
+        print(f"Error getting blocked slots: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@admin_bp.route('/api/admin/booking/<int:booking_id>', methods=['PUT'])
+@cross_origin()
+def update_booking_status(booking_id):
+    """Update booking status (confirm/cancel)"""
+    try:
+        data = request.get_json()
+        new_status = data.get('status')
+        
+        if new_status not in ['confirmed', 'cancelled', 'pending']:
+            return jsonify({'success': False, 'error': 'Invalid status'}), 400
+        
+        booking = Booking.query.get(booking_id)
+        if not booking:
+            return jsonify({'success': False, 'error': 'Booking not found'}), 404
+        
+        booking.status = new_status
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': f'Booking {new_status} successfully'})
+        
+    except Exception as e:
+        print(f"Error updating booking: {e}")
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@admin_bp.route('/api/admin/blocked-slot/<int:slot_id>', methods=['DELETE'])
+@cross_origin()
+def delete_blocked_slot(slot_id):
+    """Delete a blocked slot"""
+    try:
+        slot = BlockedSlot.query.get(slot_id)
+        if not slot:
+            return jsonify({'success': False, 'error': 'Blocked slot not found'}), 404
+        
+        db.session.delete(slot)
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': 'Blocked slot removed successfully'})
+        
+    except Exception as e:
+        print(f"Error deleting blocked slot: {e}")
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
