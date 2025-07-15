@@ -605,3 +605,26 @@ def delete_blocked_slot(slot_id):
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
+
+
+@admin_bp.route('/api/blocked-slots', methods=['GET'])
+@cross_origin()
+def get_blocked_slots():
+    """Get all blocked slots for frontend calendar"""
+    try:
+        blocked_slots = BlockedSlot.query.all()
+        blocked_data = {}
+        
+        for slot in blocked_slots:
+            date_str = slot.date.strftime('%Y-%m-%d')
+            time_str = slot.time.strftime('%I:%M %p').lstrip('0')
+            
+            if date_str not in blocked_data:
+                blocked_data[date_str] = []
+            blocked_data[date_str].append(time_str)
+        
+        return jsonify(blocked_data)
+    except Exception as e:
+        print(f"Error fetching blocked slots: {e}")
+        return jsonify({}), 500
+

@@ -69,16 +69,38 @@ const BookingModal = ({ isOpen, onClose, preSelectedService }) => {
 
   const fetchAvailability = async () => {
     try {
-      console.log('Fetching availability...')
-      const response = await fetch('https://honest-creativity-production.up.railway.app/api/availability')
-      if (response.ok) {
-        const data = await response.json()
-        console.log('Availability data:', data)
-        setBookedSlots(data)
-      } else {
-        console.error('Failed to fetch availability:', response.status)
-        setBookedSlots({})
+      console.log('Fetching availability and blocked slots...')
+      
+      // Fetch regular bookings
+      const availabilityResponse = await fetch('https://honest-creativity-production.up.railway.app/api/availability')
+      let availabilityData = {}
+      if (availabilityResponse.ok) {
+        availabilityData = await availabilityResponse.json()
+        console.log('Availability data:', availabilityData)
       }
+      
+      // Fetch blocked slots from admin bulk blocking
+      const blockedResponse = await fetch('https://honest-creativity-production.up.railway.app/api/blocked-slots')
+      let blockedData = {}
+      if (blockedResponse.ok) {
+        blockedData = await blockedResponse.json()
+        console.log('Blocked slots data:', blockedData)
+      }
+      
+      // Merge both datasets - combine regular bookings and blocked slots
+      const mergedData = { ...availabilityData }
+      Object.keys(blockedData).forEach(date => {
+        if (mergedData[date]) {
+          // Merge arrays and remove duplicates
+          mergedData[date] = [...new Set([...mergedData[date], ...blockedData[date]])]
+        } else {
+          mergedData[date] = blockedData[date]
+        }
+      })
+      
+      console.log('Merged availability + blocked slots:', mergedData)
+      setBookedSlots(mergedData)
+      
     } catch (error) {
       console.error('Error fetching availability:', error)
       setBookedSlots({})
