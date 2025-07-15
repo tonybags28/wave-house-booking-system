@@ -348,21 +348,32 @@ def create_blocked_slot():
 def get_blocked_slots():
     """Get all blocked slots for frontend calendar integration"""
     try:
+        print("Fetching blocked slots...")
         blocked_slots = BlockedSlot.query.all()
+        print(f"Found {len(blocked_slots)} blocked slots")
+        
         blocked_data = {}
         
         for slot in blocked_slots:
-            date_str = slot.date.strftime('%Y-%m-%d')
-            time_str = slot.time.strftime('%I:%M %p').lstrip('0')
-            
-            if date_str not in blocked_data:
-                blocked_data[date_str] = []
-            blocked_data[date_str].append(time_str)
+            try:
+                date_str = slot.date.strftime('%Y-%m-%d')
+                time_str = slot.time.strftime('%I:%M %p').lstrip('0')
+                
+                if date_str not in blocked_data:
+                    blocked_data[date_str] = []
+                blocked_data[date_str].append(time_str)
+            except Exception as slot_error:
+                print(f"Error processing slot {slot.id}: {slot_error}")
+                continue
         
+        print(f"Returning {len(blocked_data)} date groups")
         return jsonify(blocked_data)
+        
     except Exception as e:
         print(f"Error fetching blocked slots: {e}")
-        return jsonify({}), 500
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': 'Failed to fetch blocked slots', 'details': str(e)}), 500
 
 @booking_bp.route('/blocked-slots/<int:slot_id>', methods=['DELETE'])
 @cross_origin()
