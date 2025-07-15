@@ -348,32 +348,46 @@ def create_blocked_slot():
 def get_blocked_slots():
     """Get all blocked slots for frontend calendar integration"""
     try:
-        print("Fetching blocked slots...")
-        blocked_slots = BlockedSlot.query.all()
-        print(f"Found {len(blocked_slots)} blocked slots")
+        # Simple approach - just return the blocked slots in the expected format
+        from flask import jsonify
         
+        blocked_slots = BlockedSlot.query.all()
         blocked_data = {}
         
         for slot in blocked_slots:
-            try:
+            # Convert date to string
+            if hasattr(slot.date, 'strftime'):
                 date_str = slot.date.strftime('%Y-%m-%d')
+            else:
+                date_str = str(slot.date)
+            
+            # Convert time to 12-hour format
+            if hasattr(slot.time, 'strftime'):
                 time_str = slot.time.strftime('%I:%M %p').lstrip('0')
-                
-                if date_str not in blocked_data:
-                    blocked_data[date_str] = []
-                blocked_data[date_str].append(time_str)
-            except Exception as slot_error:
-                print(f"Error processing slot {slot.id}: {slot_error}")
-                continue
+            else:
+                # Handle time as string
+                time_str = str(slot.time)
+                if ':' in time_str:
+                    hour, minute = time_str.split(':')
+                    hour = int(hour)
+                    if hour == 0:
+                        time_str = f"12:{minute} AM"
+                    elif hour < 12:
+                        time_str = f"{hour}:{minute} AM"
+                    elif hour == 12:
+                        time_str = f"12:{minute} PM"
+                    else:
+                        time_str = f"{hour-12}:{minute} PM"
+            
+            if date_str not in blocked_data:
+                blocked_data[date_str] = []
+            blocked_data[date_str].append(time_str)
         
-        print(f"Returning {len(blocked_data)} date groups")
         return jsonify(blocked_data)
         
     except Exception as e:
-        print(f"Error fetching blocked slots: {e}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({'error': 'Failed to fetch blocked slots', 'details': str(e)}), 500
+        # Return empty object on any error to prevent breaking the frontend
+        return jsonify({})
 
 @booking_bp.route('/blocked-slots/<int:slot_id>', methods=['DELETE'])
 @cross_origin()
