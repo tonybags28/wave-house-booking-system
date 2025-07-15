@@ -108,6 +108,11 @@ with app.app_context():
     # Initialize Wave House specific tables
     initialize_database()
 
+@app.route('/admin.html')
+def serve_admin_html():
+    """Serve the static admin HTML file"""
+    return send_from_directory('static', 'admin.html')
+
 @app.route('/admin')
 def admin():
     """Comprehensive admin dashboard"""
