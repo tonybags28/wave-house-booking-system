@@ -210,11 +210,17 @@ def admin_dashboard():
     if request.method == 'POST':
         # Handle login
         password = request.form.get('password')
-        if password == ADMIN_PASSWORD:
+        print(f"DEBUG: Received password: '{password}'")
+        print(f"DEBUG: Expected password: '{ADMIN_PASSWORD}'")
+        print(f"DEBUG: Password match: {password == ADMIN_PASSWORD}")
+        
+        if password and password.strip() == ADMIN_PASSWORD:
             session['admin_authenticated'] = True
+            print("DEBUG: Authentication successful")
             # Redirect to dashboard after successful login
             return admin_dashboard_view()
         else:
+            print("DEBUG: Authentication failed")
             return render_template_string(LOGIN_TEMPLATE, error="Incorrect password")
     
     # Check if already authenticated
