@@ -346,11 +346,23 @@ def create_blocked_slot():
 @booking_bp.route('/blocked-slots', methods=['GET'])
 @cross_origin()
 def get_blocked_slots():
+    """Get all blocked slots for frontend calendar integration"""
     try:
         blocked_slots = BlockedSlot.query.all()
-        return jsonify([slot.to_dict() for slot in blocked_slots])
+        blocked_data = {}
+        
+        for slot in blocked_slots:
+            date_str = slot.date.strftime('%Y-%m-%d')
+            time_str = slot.time.strftime('%I:%M %p').lstrip('0')
+            
+            if date_str not in blocked_data:
+                blocked_data[date_str] = []
+            blocked_data[date_str].append(time_str)
+        
+        return jsonify(blocked_data)
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        print(f"Error fetching blocked slots: {e}")
+        return jsonify({}), 500
 
 @booking_bp.route('/blocked-slots/<int:slot_id>', methods=['DELETE'])
 @cross_origin()
