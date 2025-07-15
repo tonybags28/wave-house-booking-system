@@ -6,7 +6,7 @@ from flask_cors import cross_origin
 admin_bp = Blueprint('admin', __name__)
 
 # Admin password - change this to something secure
-ADMIN_PASSWORD = "wavehouse2025"
+ADMIN_PASSWORD = "admin123"
 
 # Login form template
 LOGIN_TEMPLATE = """
