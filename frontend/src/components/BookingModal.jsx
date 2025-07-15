@@ -80,7 +80,7 @@ const BookingModal = ({ isOpen, onClose, preSelectedService }) => {
       }
       
       // Fetch blocked slots from admin bulk blocking
-      const blockedResponse = await fetch('https://honest-creativity-production.up.railway.app/api/blocked-slots')
+      const blockedResponse = await fetch('/api/blocked-slots')
       let blockedData = {}
       if (blockedResponse.ok) {
         blockedData = await blockedResponse.json()
