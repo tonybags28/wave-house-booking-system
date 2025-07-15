@@ -54,7 +54,6 @@ function App() {
                 <button onClick={() => scrollToSection('gear')} className="hover:text-cyan-400 px-3 py-2 text-sm font-medium transition-colors">Gear</button>
                 <button onClick={() => scrollToSection('rules')} className="hover:text-cyan-400 px-3 py-2 text-sm font-medium transition-colors">Studio Rules</button>
                 <button onClick={() => scrollToSection('contact')} className="hover:text-cyan-400 px-3 py-2 text-sm font-medium transition-colors">Contact</button>
-                <button onClick={() => window.open('https://ogh5izcvn7ky.manus.space/admin', '_blank')} className="hover:text-cyan-400 px-3 py-2 text-sm font-medium transition-colors opacity-70" title="Admin Dashboard">Admin</button>
               </div>
             </div>
             <Button onClick={openBookingModal} className="bg-gradient-to-r from-cyan-500 to-teal-600 hover:from-cyan-600 hover:to-teal-700">
