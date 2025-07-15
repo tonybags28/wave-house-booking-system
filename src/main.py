@@ -77,10 +77,11 @@ app.config['SECRET_KEY'] = 'asdf#FGSgvasgf$5$WGT'
 CORS(app, origins=['*'], methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], 
      allow_headers=['Content-Type', 'Authorization'], supports_credentials=True)
 
+# Register blueprints BEFORE catch-all route to ensure proper routing
+app.register_blueprint(admin_bp)  # Register admin first to avoid conflicts
 app.register_blueprint(user_bp, url_prefix='/api')
 app.register_blueprint(booking_bp, url_prefix='/api')
 app.register_blueprint(simple_booking_bp, url_prefix='/api')
-app.register_blueprint(admin_bp)
 app.register_blueprint(payment_bp)
 app.register_blueprint(verification_bp)
 
