@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, session, redirect, render_template_string
 from datetime import datetime, date, timedelta
 from src.models.booking import db, Booking, BlockedSlot
 from src.utils.email_sender import send_booking_notification
@@ -346,11 +346,48 @@ def create_blocked_slot():
 @booking_bp.route('/blocked-slots', methods=['GET'])
 @cross_origin()
 def get_blocked_slots():
+    """Get all blocked slots for frontend calendar integration"""
     try:
+        # Simple approach - just return the blocked slots in the expected format
+        from flask import jsonify
+        
         blocked_slots = BlockedSlot.query.all()
-        return jsonify([slot.to_dict() for slot in blocked_slots])
+        blocked_data = {}
+        
+        for slot in blocked_slots:
+            # Convert date to string
+            if hasattr(slot.date, 'strftime'):
+                date_str = slot.date.strftime('%Y-%m-%d')
+            else:
+                date_str = str(slot.date)
+            
+            # Convert time to 12-hour format
+            if hasattr(slot.time, 'strftime'):
+                time_str = slot.time.strftime('%I:%M %p').lstrip('0')
+            else:
+                # Handle time as string
+                time_str = str(slot.time)
+                if ':' in time_str:
+                    hour, minute = time_str.split(':')
+                    hour = int(hour)
+                    if hour == 0:
+                        time_str = f"12:{minute} AM"
+                    elif hour < 12:
+                        time_str = f"{hour}:{minute} AM"
+                    elif hour == 12:
+                        time_str = f"12:{minute} PM"
+                    else:
+                        time_str = f"{hour-12}:{minute} PM"
+            
+            if date_str not in blocked_data:
+                blocked_data[date_str] = []
+            blocked_data[date_str].append(time_str)
+        
+        return jsonify(blocked_data)
+        
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        # Return empty object on any error to prevent breaking the frontend
+        return jsonify({})
 
 @booking_bp.route('/blocked-slots/<int:slot_id>', methods=['DELETE'])
 @cross_origin()
@@ -445,6 +482,580 @@ def create_mixing_request():
             'request': mixing_request.to_dict()
         }), 201
         
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+
+# ============================================================================
+# ADMIN INTERFACE (Temporary workaround for admin blueprint issues)
+# ============================================================================
+
+@booking_bp.route('/wave-admin', methods=['GET', 'POST'])
+def wave_admin_dashboard():
+    """Admin dashboard with authentication"""
+    if request.method == 'POST':
+        # Handle login
+        password = request.form.get('password')
+        if password and password.strip() == "admin123":
+            # Simple session-based auth
+            from flask import session
+            session['wave_admin_authenticated'] = True
+            return wave_admin_dashboard_view()
+        else:
+            return render_admin_login(error="Incorrect password")
+    
+    # Check if already authenticated
+    from flask import session
+    if session.get('wave_admin_authenticated'):
+        return wave_admin_dashboard_view()
+    else:
+        return render_admin_login()
+
+def render_admin_login(error=None):
+    """Render admin login page"""
+    error_msg = f'<div style="color: red; margin-bottom: 10px;">{error}</div>' if error else ''
+    
+    login_html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Wave House Admin - Login</title>
+        <style>
+            body {{ 
+                font-family: Arial, sans-serif; 
+                background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+                margin: 0; 
+                padding: 0; 
+                display: flex; 
+                justify-content: center; 
+                align-items: center; 
+                min-height: 100vh;
+            }}
+            .login-container {{
+                background: rgba(255, 255, 255, 0.1);
+                backdrop-filter: blur(10px);
+                border-radius: 15px;
+                padding: 40px;
+                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                text-align: center;
+                min-width: 300px;
+            }}
+            .logo {{
+                color: #00d4ff;
+                font-size: 24px;
+                font-weight: bold;
+                margin-bottom: 10px;
+            }}
+            .subtitle {{
+                color: #ffffff;
+                margin-bottom: 30px;
+                opacity: 0.8;
+            }}
+            input[type="password"] {{
+                width: 100%;
+                padding: 12px;
+                border: 1px solid rgba(255, 255, 255, 0.3);
+                border-radius: 8px;
+                background: rgba(255, 255, 255, 0.1);
+                color: white;
+                font-size: 16px;
+                margin-bottom: 20px;
+                box-sizing: border-box;
+            }}
+            input[type="password"]::placeholder {{
+                color: rgba(255, 255, 255, 0.7);
+            }}
+            button {{
+                width: 100%;
+                padding: 12px;
+                background: #00d4ff;
+                color: white;
+                border: none;
+                border-radius: 8px;
+                font-size: 16px;
+                font-weight: bold;
+                cursor: pointer;
+                transition: background 0.3s;
+            }}
+            button:hover {{
+                background: #00b8e6;
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="login-container">
+            <div class="logo">🎵 Wave House</div>
+            <div class="subtitle">Admin Dashboard</div>
+            {error_msg}
+            <form method="post">
+                <input type="password" name="password" placeholder="Enter admin password" required>
+                <button type="submit">Access Dashboard</button>
+            </form>
+        </div>
+    </body>
+    </html>
+    """
+    return login_html
+
+def wave_admin_dashboard_view():
+    """Render the main admin dashboard"""
+    # Get statistics
+    total_bookings = Booking.query.count()
+    pending_bookings = Booking.query.filter_by(status='pending').count()
+    confirmed_bookings = Booking.query.filter_by(status='confirmed').count()
+    blocked_slots = BlockedSlot.query.count()
+    
+    dashboard_html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Wave House Admin Dashboard</title>
+        <style>
+            body {{
+                font-family: Arial, sans-serif;
+                margin: 0;
+                padding: 20px;
+                background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+                min-height: 100vh;
+                color: white;
+            }}
+            .header {{
+                text-align: center;
+                margin-bottom: 30px;
+            }}
+            .header h1 {{
+                color: #00d4ff;
+                font-size: 32px;
+                margin: 0;
+            }}
+            .stats-grid {{
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                gap: 20px;
+                margin-bottom: 30px;
+            }}
+            .stat-card {{
+                background: rgba(255, 255, 255, 0.1);
+                backdrop-filter: blur(10px);
+                border-radius: 15px;
+                padding: 20px;
+                text-align: center;
+                border: 1px solid rgba(255, 255, 255, 0.2);
+            }}
+            .stat-number {{
+                font-size: 36px;
+                font-weight: bold;
+                color: #00d4ff;
+                margin-bottom: 5px;
+            }}
+            .stat-label {{
+                font-size: 14px;
+                opacity: 0.8;
+            }}
+            .actions {{
+                display: flex;
+                gap: 15px;
+                justify-content: center;
+                flex-wrap: wrap;
+            }}
+            .action-btn {{
+                background: #00d4ff;
+                color: white;
+                padding: 12px 24px;
+                border: none;
+                border-radius: 8px;
+                font-size: 16px;
+                font-weight: bold;
+                cursor: pointer;
+                text-decoration: none;
+                display: inline-block;
+                transition: background 0.3s;
+            }}
+            .action-btn:hover {{
+                background: #00b8e6;
+            }}
+            .action-btn.secondary {{
+                background: rgba(255, 255, 255, 0.2);
+            }}
+            .action-btn.secondary:hover {{
+                background: rgba(255, 255, 255, 0.3);
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="header">
+            <h1>Wave House Admin Dashboard</h1>
+        </div>
+        
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-number">{total_bookings}</div>
+                <div class="stat-label">Total Bookings</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">{pending_bookings}</div>
+                <div class="stat-label">Pending</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">{confirmed_bookings}</div>
+                <div class="stat-label">Confirmed</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">{blocked_slots}</div>
+                <div class="stat-label">Blocked Slots</div>
+            </div>
+        </div>
+        
+        <div class="actions">
+            <a href="/api/wave-admin/bookings" class="action-btn">Booking Requests</a>
+            <a href="/api/wave-admin/bulk-block" class="action-btn">Bulk Block Times</a>
+            <a href="/api/wave-admin/manage-blocks" class="action-btn">Manage Blocked Slots</a>
+            <a href="/api/wave-admin/logout" class="action-btn secondary">Logout</a>
+        </div>
+    </body>
+    </html>
+    """
+    return dashboard_html
+
+@booking_bp.route('/wave-admin/logout')
+def wave_admin_logout():
+    """Logout admin user"""
+    from flask import session, redirect
+    session.pop('wave_admin_authenticated', None)
+    return redirect('/api/wave-admin')
+
+@booking_bp.route('/wave-admin/manage-blocks')
+def wave_admin_manage_blocks():
+    """Manage blocked slots interface"""
+    from flask import session
+    if not session.get('wave_admin_authenticated'):
+        return redirect('/api/wave-admin')
+    
+    # Get all blocked slots grouped by date
+    blocked_slots = BlockedSlot.query.order_by(BlockedSlot.date, BlockedSlot.time).all()
+    
+    # Group by date
+    slots_by_date = {}
+    for slot in blocked_slots:
+        date_str = slot.date.strftime('%Y-%m-%d')
+        if date_str not in slots_by_date:
+            slots_by_date[date_str] = []
+        slots_by_date[date_str].append(slot)
+    
+    # Generate HTML for blocked slots
+    slots_html = ""
+    for date_str, slots in sorted(slots_by_date.items()):
+        date_obj = datetime.strptime(date_str, '%Y-%m-%d').date()
+        formatted_date = date_obj.strftime('%B %d, %Y')
+        
+        slots_html += f"""
+        <div class="date-group">
+            <h3>{formatted_date} ({len(slots)} slots)</h3>
+            <div class="date-actions">
+                <button onclick="deleteAllForDate('{date_str}')" class="btn-danger">Delete All for This Date</button>
+            </div>
+            <div class="slots-grid">
+        """
+        
+        for slot in slots:
+            time_str = slot.time.strftime('%I:%M %p')
+            slots_html += f"""
+                <div class="slot-item" data-id="{slot.id}">
+                    <span class="slot-time">{time_str}</span>
+                    <span class="slot-reason">{slot.reason or 'No reason'}</span>
+                    <button onclick="deleteSlot({slot.id})" class="btn-delete">×</button>
+                </div>
+            """
+        
+        slots_html += """
+            </div>
+        </div>
+        """
+    
+    if not slots_html:
+        slots_html = "<p>No blocked slots found.</p>"
+    
+    manage_html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Manage Blocked Slots - Wave House Admin</title>
+        <style>
+            body {{
+                font-family: Arial, sans-serif;
+                margin: 0;
+                padding: 20px;
+                background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+                min-height: 100vh;
+                color: white;
+            }}
+            .header {{
+                text-align: center;
+                margin-bottom: 30px;
+            }}
+            .header h1 {{
+                color: #00d4ff;
+                font-size: 28px;
+                margin: 0;
+            }}
+            .back-btn {{
+                background: rgba(255, 255, 255, 0.2);
+                color: white;
+                padding: 8px 16px;
+                border: none;
+                border-radius: 6px;
+                text-decoration: none;
+                display: inline-block;
+                margin-bottom: 20px;
+            }}
+            .date-group {{
+                background: rgba(255, 255, 255, 0.1);
+                backdrop-filter: blur(10px);
+                border-radius: 15px;
+                padding: 20px;
+                margin-bottom: 20px;
+                border: 1px solid rgba(255, 255, 255, 0.2);
+            }}
+            .date-group h3 {{
+                color: #00d4ff;
+                margin-top: 0;
+                margin-bottom: 15px;
+            }}
+            .date-actions {{
+                margin-bottom: 15px;
+            }}
+            .slots-grid {{
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+                gap: 10px;
+            }}
+            .slot-item {{
+                background: rgba(255, 255, 255, 0.1);
+                border-radius: 8px;
+                padding: 10px;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                border: 1px solid rgba(255, 255, 255, 0.2);
+            }}
+            .slot-time {{
+                font-weight: bold;
+                color: #00d4ff;
+            }}
+            .slot-reason {{
+                font-size: 12px;
+                opacity: 0.8;
+                margin-left: 10px;
+                flex-grow: 1;
+            }}
+            .btn-delete {{
+                background: #ff4757;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                width: 24px;
+                height: 24px;
+                cursor: pointer;
+                font-size: 16px;
+                line-height: 1;
+            }}
+            .btn-danger {{
+                background: #ff4757;
+                color: white;
+                border: none;
+                border-radius: 6px;
+                padding: 8px 16px;
+                cursor: pointer;
+                font-size: 14px;
+            }}
+            .btn-danger:hover {{
+                background: #ff3742;
+            }}
+            .success-msg {{
+                background: #2ed573;
+                color: white;
+                padding: 10px;
+                border-radius: 6px;
+                margin-bottom: 20px;
+                display: none;
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="header">
+            <a href="/api/wave-admin" class="back-btn">← Back to Dashboard</a>
+            <h1>Manage Blocked Slots</h1>
+        </div>
+        
+        <div id="success-msg" class="success-msg"></div>
+        
+        <div id="blocked-slots">
+            {slots_html}
+        </div>
+        
+        <script>
+            function deleteSlot(slotId) {{
+                if (confirm('Are you sure you want to delete this blocked slot?')) {{
+                    fetch('/api/delete-blocked-slot', {{
+                        method: 'POST',
+                        headers: {{
+                            'Content-Type': 'application/json',
+                        }},
+                        body: JSON.stringify({{ slot_id: slotId }})
+                    }})
+                    .then(response => response.json())
+                    .then(data => {{
+                        if (data.success) {{
+                            document.querySelector(`[data-id="${{slotId}}"]`).remove();
+                            showSuccess('Blocked slot deleted successfully');
+                        }} else {{
+                            alert('Error deleting slot: ' + data.error);
+                        }}
+                    }})
+                    .catch(error => {{
+                        alert('Error deleting slot: ' + error);
+                    }});
+                }}
+            }}
+            
+            function deleteAllForDate(dateStr) {{
+                if (confirm(`Are you sure you want to delete ALL blocked slots for ${{dateStr}}?`)) {{
+                    fetch('/api/delete-blocked-slots-by-date', {{
+                        method: 'POST',
+                        headers: {{
+                            'Content-Type': 'application/json',
+                        }},
+                        body: JSON.stringify({{ date: dateStr }})
+                    }})
+                    .then(response => response.json())
+                    .then(data => {{
+                        if (data.success) {{
+                            location.reload();
+                        }} else {{
+                            alert('Error deleting slots: ' + data.error);
+                        }}
+                    }})
+                    .catch(error => {{
+                        alert('Error deleting slots: ' + error);
+                    }});
+                }}
+            }}
+            
+            function showSuccess(message) {{
+                const successMsg = document.getElementById('success-msg');
+                successMsg.textContent = message;
+                successMsg.style.display = 'block';
+                setTimeout(() => {{
+                    successMsg.style.display = 'none';
+                }}, 3000);
+            }}
+        </script>
+    </body>
+    </html>
+    """
+    return manage_html
+
+@booking_bp.route('/delete-blocked-slot', methods=['POST'])
+def delete_blocked_slot():
+    """Delete a single blocked slot"""
+    try:
+        data = request.get_json()
+        slot_id = data.get('slot_id')
+        
+        slot = BlockedSlot.query.get(slot_id)
+        if slot:
+            db.session.delete(slot)
+            db.session.commit()
+            return jsonify({'success': True})
+        else:
+            return jsonify({'success': False, 'error': 'Slot not found'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)})
+
+@booking_bp.route('/delete-blocked-slots-by-date', methods=['POST'])
+def delete_blocked_slots_by_date():
+    """Delete all blocked slots for a specific date"""
+    try:
+        data = request.get_json()
+        date_str = data.get('date')
+        date_obj = datetime.strptime(date_str, '%Y-%m-%d').date()
+        
+        slots = BlockedSlot.query.filter_by(date=date_obj).all()
+        for slot in slots:
+            db.session.delete(slot)
+        
+        db.session.commit()
+        return jsonify({'success': True, 'deleted_count': len(slots)})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)})
+
+
+
+@booking_bp.route('/admin-stats', methods=['GET'])
+def get_admin_stats():
+    """Get admin dashboard statistics"""
+    try:
+        total_bookings = Booking.query.count()
+        pending_bookings = Booking.query.filter_by(status='pending').count()
+        confirmed_bookings = Booking.query.filter_by(status='confirmed').count()
+        blocked_slots = BlockedSlot.query.count()
+        
+        return jsonify({
+            'total': total_bookings,
+            'pending': pending_bookings,
+            'confirmed': confirmed_bookings,
+            'blocked': blocked_slots
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@booking_bp.route('/delete-blocked-slot', methods=['POST'])
+def delete_blocked_slot():
+    """Delete a specific blocked slot"""
+    try:
+        data = request.get_json()
+        slot_id = data.get('slot_id')
+        
+        if not slot_id:
+            return jsonify({'error': 'Slot ID is required'}), 400
+        
+        slot = BlockedSlot.query.get(slot_id)
+        if not slot:
+            return jsonify({'error': 'Slot not found'}), 404
+        
+        db.session.delete(slot)
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': 'Blocked slot deleted successfully'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@booking_bp.route('/delete-blocked-slots-by-date', methods=['POST'])
+def delete_blocked_slots_by_date():
+    """Delete all blocked slots for a specific date"""
+    try:
+        data = request.get_json()
+        date = data.get('date')
+        
+        if not date:
+            return jsonify({'error': 'Date is required'}), 400
+        
+        # Delete all slots for the specified date
+        deleted_count = BlockedSlot.query.filter_by(date=date).delete()
+        db.session.commit()
+        
+        return jsonify({
+            'success': True, 
+            'message': f'Deleted {deleted_count} blocked slots for {date}',
+            'deleted_count': deleted_count
+        })
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500

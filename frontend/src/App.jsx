@@ -1,10 +1,10 @@
 import './App.css'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from './components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './components/ui/card'
 import { Badge } from './components/ui/badge'
 import { Separator } from './components/ui/separator'
-import { MapPin, Clock, Users, Mic, Volume2, Headphones, Music, Star, Phone, Mail, Instagram, Twitter } from 'lucide-react'
+import { MapPin, Clock, Users, Mic, Volume2, Headphones, Music, Star, Phone, Mail, Instagram, Twitter, X, Trash2, Shield } from 'lucide-react'
 import BookingModal from './components/BookingModal'
 import studioHero from './assets/studio-hero.jpg'
 import controlRoom from './assets/control-room.jpg'
@@ -17,6 +17,15 @@ function App() {
   const [activeSection, setActiveSection] = useState('home')
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false)
   const [preSelectedService, setPreSelectedService] = useState(null)
+  
+  // Admin functionality
+  const [isAdminModalOpen, setIsAdminModalOpen] = useState(false)
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false)
+  const [adminPassword, setAdminPassword] = useState('')
+  const [adminView, setAdminView] = useState('dashboard') // dashboard, manage-blocks
+  const [blockedSlots, setBlockedSlots] = useState([])
+  const [adminStats, setAdminStats] = useState({ total: 0, pending: 0, confirmed: 0, blocked: 0 })
+  const [adminMessage, setAdminMessage] = useState('')
 
   const scrollToSection = (sectionId) => {
     const element = document.getElementById(sectionId)
@@ -34,6 +43,108 @@ function App() {
   const closeBookingModal = () => {
     setIsBookingModalOpen(false)
     setPreSelectedService(null)
+  }
+
+  // Admin functionality
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      // Ctrl + Shift + A to open admin
+      if (event.ctrlKey && event.shiftKey && event.key === 'A') {
+        event.preventDefault()
+        setIsAdminModalOpen(true)
+      }
+      // Escape to close admin modal
+      if (event.key === 'Escape' && isAdminModalOpen) {
+        closeAdminModal()
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [isAdminModalOpen])
+
+  const closeAdminModal = () => {
+    setIsAdminModalOpen(false)
+    setIsAdminAuthenticated(false)
+    setAdminPassword('')
+    setAdminView('dashboard')
+    setAdminMessage('')
+  }
+
+  const handleAdminLogin = async (e) => {
+    e.preventDefault()
+    if (adminPassword === 'admin123') {
+      setIsAdminAuthenticated(true)
+      setAdminMessage('')
+      await loadAdminData()
+    } else {
+      setAdminMessage('Incorrect password')
+      setAdminPassword('')
+    }
+  }
+
+  const loadAdminData = async () => {
+    try {
+      // Load admin statistics
+      const statsResponse = await fetch('/api/admin-stats')
+      if (statsResponse.ok) {
+        const stats = await statsResponse.json()
+        setAdminStats(stats)
+      }
+
+      // Load blocked slots
+      const blockedResponse = await fetch('/api/blocked-slots')
+      if (blockedResponse.ok) {
+        const blocked = await blockedResponse.json()
+        setBlockedSlots(blocked)
+      }
+    } catch (error) {
+      console.error('Error loading admin data:', error)
+    }
+  }
+
+  const deleteBlockedSlot = async (slotId) => {
+    if (!confirm('Are you sure you want to delete this blocked slot?')) return
+    
+    try {
+      const response = await fetch('/api/delete-blocked-slot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slot_id: slotId })
+      })
+      
+      if (response.ok) {
+        setAdminMessage('Blocked slot deleted successfully')
+        await loadAdminData()
+        setTimeout(() => setAdminMessage(''), 3000)
+      } else {
+        setAdminMessage('Error deleting slot')
+      }
+    } catch (error) {
+      setAdminMessage('Error deleting slot: ' + error.message)
+    }
+  }
+
+  const deleteAllSlotsForDate = async (date) => {
+    if (!confirm(`Are you sure you want to delete ALL blocked slots for ${date}?`)) return
+    
+    try {
+      const response = await fetch('/api/delete-blocked-slots-by-date', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date })
+      })
+      
+      if (response.ok) {
+        setAdminMessage('All slots for date deleted successfully')
+        await loadAdminData()
+        setTimeout(() => setAdminMessage(''), 3000)
+      } else {
+        setAdminMessage('Error deleting slots')
+      }
+    } catch (error) {
+      setAdminMessage('Error deleting slots: ' + error.message)
+    }
   }
 
   return (
@@ -54,7 +165,6 @@ function App() {
                 <button onClick={() => scrollToSection('gear')} className="hover:text-cyan-400 px-3 py-2 text-sm font-medium transition-colors">Gear</button>
                 <button onClick={() => scrollToSection('rules')} className="hover:text-cyan-400 px-3 py-2 text-sm font-medium transition-colors">Studio Rules</button>
                 <button onClick={() => scrollToSection('contact')} className="hover:text-cyan-400 px-3 py-2 text-sm font-medium transition-colors">Contact</button>
-                <button onClick={() => window.open('https://ogh5izcvn7ky.manus.space/admin', '_blank')} className="hover:text-cyan-400 px-3 py-2 text-sm font-medium transition-colors opacity-70" title="Admin Dashboard">Admin</button>
               </div>
             </div>
             <Button onClick={openBookingModal} className="bg-gradient-to-r from-cyan-500 to-teal-600 hover:from-cyan-600 hover:to-teal-700">
@@ -611,6 +721,197 @@ function App() {
         onClose={closeBookingModal} 
         preSelectedService={preSelectedService}
       />
+
+      {/* Admin Modal */}
+      {isAdminModalOpen && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-gray-900 rounded-lg border border-gray-700 w-full max-w-4xl max-h-[90vh] overflow-hidden">
+            {/* Admin Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-700">
+              <div className="flex items-center gap-3">
+                <Shield className="w-6 h-6 text-cyan-400" />
+                <h2 className="text-xl font-bold text-white">Wave House Admin</h2>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={closeAdminModal}
+                className="text-gray-400 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </Button>
+            </div>
+
+            {/* Admin Content */}
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-80px)]">
+              {!isAdminAuthenticated ? (
+                // Login Form
+                <div className="max-w-md mx-auto">
+                  <div className="text-center mb-6">
+                    <h3 className="text-lg font-semibold text-white mb-2">Admin Access</h3>
+                    <p className="text-gray-400 text-sm">Enter admin password to continue</p>
+                  </div>
+                  
+                  {adminMessage && (
+                    <div className="mb-4 p-3 bg-red-500/20 border border-red-500/30 rounded text-red-400 text-sm">
+                      {adminMessage}
+                    </div>
+                  )}
+                  
+                  <form onSubmit={handleAdminLogin} className="space-y-4">
+                    <input
+                      type="password"
+                      value={adminPassword}
+                      onChange={(e) => setAdminPassword(e.target.value)}
+                      placeholder="Admin password"
+                      className="w-full p-3 bg-gray-800 border border-gray-600 rounded text-white placeholder-gray-400 focus:border-cyan-400 focus:outline-none"
+                      autoFocus
+                    />
+                    <Button type="submit" className="w-full bg-cyan-500 hover:bg-cyan-600 text-white">
+                      Access Dashboard
+                    </Button>
+                  </form>
+                </div>
+              ) : (
+                // Admin Dashboard
+                <div>
+                  {/* Admin Navigation */}
+                  <div className="flex gap-4 mb-6 border-b border-gray-700 pb-4">
+                    <Button
+                      variant={adminView === 'dashboard' ? 'default' : 'ghost'}
+                      onClick={() => setAdminView('dashboard')}
+                      className={adminView === 'dashboard' ? 'bg-cyan-500 text-white' : 'text-gray-400 hover:text-white'}
+                    >
+                      Dashboard
+                    </Button>
+                    <Button
+                      variant={adminView === 'manage-blocks' ? 'default' : 'ghost'}
+                      onClick={() => setAdminView('manage-blocks')}
+                      className={adminView === 'manage-blocks' ? 'bg-cyan-500 text-white' : 'text-gray-400 hover:text-white'}
+                    >
+                      Manage Blocked Slots
+                    </Button>
+                  </div>
+
+                  {/* Success/Error Messages */}
+                  {adminMessage && (
+                    <div className="mb-4 p-3 bg-green-500/20 border border-green-500/30 rounded text-green-400 text-sm">
+                      {adminMessage}
+                    </div>
+                  )}
+
+                  {/* Dashboard View */}
+                  {adminView === 'dashboard' && (
+                    <div>
+                      <h3 className="text-lg font-semibold text-white mb-4">Dashboard Overview</h3>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                        <Card className="bg-gray-800 border-gray-700">
+                          <CardContent className="p-4 text-center">
+                            <div className="text-2xl font-bold text-cyan-400">{adminStats.total}</div>
+                            <div className="text-sm text-gray-400">Total Bookings</div>
+                          </CardContent>
+                        </Card>
+                        <Card className="bg-gray-800 border-gray-700">
+                          <CardContent className="p-4 text-center">
+                            <div className="text-2xl font-bold text-yellow-400">{adminStats.pending}</div>
+                            <div className="text-sm text-gray-400">Pending</div>
+                          </CardContent>
+                        </Card>
+                        <Card className="bg-gray-800 border-gray-700">
+                          <CardContent className="p-4 text-center">
+                            <div className="text-2xl font-bold text-green-400">{adminStats.confirmed}</div>
+                            <div className="text-sm text-gray-400">Confirmed</div>
+                          </CardContent>
+                        </Card>
+                        <Card className="bg-gray-800 border-gray-700">
+                          <CardContent className="p-4 text-center">
+                            <div className="text-2xl font-bold text-red-400">{adminStats.blocked}</div>
+                            <div className="text-sm text-gray-400">Blocked Slots</div>
+                          </CardContent>
+                        </Card>
+                      </div>
+                      
+                      <div className="text-center">
+                        <Button
+                          onClick={() => setAdminView('manage-blocks')}
+                          className="bg-cyan-500 hover:bg-cyan-600 text-white"
+                        >
+                          Manage Blocked Slots
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Manage Blocked Slots View */}
+                  {adminView === 'manage-blocks' && (
+                    <div>
+                      <h3 className="text-lg font-semibold text-white mb-4">Manage Blocked Slots</h3>
+                      
+                      {Object.keys(blockedSlots).length === 0 ? (
+                        <div className="text-center py-8">
+                          <p className="text-gray-400">No blocked slots found.</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-6">
+                          {Object.entries(blockedSlots).map(([date, slots]) => (
+                            <Card key={date} className="bg-gray-800 border-gray-700">
+                              <CardHeader className="pb-3">
+                                <div className="flex items-center justify-between">
+                                  <CardTitle className="text-cyan-400">
+                                    {new Date(date + 'T00:00:00').toLocaleDateString('en-US', { 
+                                      weekday: 'long', 
+                                      year: 'numeric', 
+                                      month: 'long', 
+                                      day: 'numeric' 
+                                    })}
+                                  </CardTitle>
+                                  <div className="flex items-center gap-2">
+                                    <Badge variant="secondary" className="bg-gray-700 text-gray-300">
+                                      {slots.length} slots
+                                    </Badge>
+                                    <Button
+                                      variant="destructive"
+                                      size="sm"
+                                      onClick={() => deleteAllSlotsForDate(date)}
+                                      className="bg-red-600 hover:bg-red-700"
+                                    >
+                                      Delete All
+                                    </Button>
+                                  </div>
+                                </div>
+                              </CardHeader>
+                              <CardContent>
+                                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2">
+                                  {slots.map((slot) => (
+                                    <div
+                                      key={slot.id}
+                                      className="flex items-center justify-between bg-gray-700 rounded p-2 text-sm"
+                                    >
+                                      <span className="text-white font-medium">{slot.time}</span>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => deleteBlockedSlot(slot.id)}
+                                        className="text-red-400 hover:text-red-300 hover:bg-red-500/20 p-1 h-auto"
+                                      >
+                                        <Trash2 className="w-3 h-3" />
+                                      </Button>
+                                    </div>
+                                  ))}
+                                </div>
+                              </CardContent>
+                            </Card>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

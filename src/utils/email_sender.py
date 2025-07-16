@@ -14,7 +14,7 @@ def send_booking_notification(booking_data, request_type):
         GMAIL_SMTP_SERVER = "smtp.gmail.com"
         GMAIL_SMTP_PORT = 587
         GMAIL_EMAIL = os.getenv("GMAIL_EMAIL", "letswork@wavehousela.com")
-        GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD", "narm fxzx gjfz ouqj")  # App password from user
+        GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD", "rkyu btcu xqfn rbsx")  # Updated app password
         
         # Format the email content based on request type
         if request_type == "studio-access":

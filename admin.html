@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wave House Admin</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: Arial, sans-serif; 
+            background: #1a1a1a; 
+            color: white; 
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .header { 
+            background: linear-gradient(135deg, #00bcd4, #0097a7);
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        .login-form {
+            background: #2a2a2a;
+            padding: 30px;
+            border-radius: 10px;
+            max-width: 400px;
+            margin: 100px auto;
+        }
+        .admin-content {
+            background: #2a2a2a;
+            padding: 30px;
+            border-radius: 10px;
+        }
+        .input-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #00bcd4;
+        }
+        input[type="password"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #444;
+            border-radius: 5px;
+            background: #1a1a1a;
+            color: white;
+        }
+        .btn {
+            background: #00bcd4;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .btn:hover { background: #0097a7; }
+        .btn-danger { background: #f44336; }
+        .btn-danger:hover { background: #d32f2f; }
+        .blocked-slots {
+            display: grid;
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .date-group {
+            background: #333;
+            padding: 15px;
+            border-radius: 8px;
+        }
+        .date-header {
+            color: #00bcd4;
+            font-size: 18px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .time-slots {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .time-slot {
+            background: #444;
+            padding: 8px 12px;
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .delete-btn {
+            background: #f44336;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .stat-card {
+            background: #333;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .stat-number {
+            font-size: 2em;
+            color: #00bcd4;
+            font-weight: bold;
+        }
+        .message {
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            background: #4caf50;
+            color: white;
+        }
+        .error {
+            background: #f44336;
+        }
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #00bcd4;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div id="loginForm" class="login-form">
+            <div class="header">
+                <h1>🎵 Wave House Admin</h1>
+                <p>Manage Blocked Slots</p>
+            </div>
+            <div class="input-group">
+                <label for="password">Admin Password:</label>
+                <input type="password" id="password" placeholder="Enter admin password">
+            </div>
+            <button onclick="login()" class="btn">Login</button>
+            <div id="loginError" class="message error" style="display: none;"></div>
+        </div>
+
+        <div id="adminContent" style="display: none;">
+            <div class="header">
+                <h1>🎵 Wave House Admin Dashboard</h1>
+                <p>Manage Blocked Time Slots</p>
+            </div>
+
+            <div id="message" class="message" style="display: none;"></div>
+
+            <div class="admin-content">
+                <div class="stats">
+                    <div class="stat-card">
+                        <div id="totalBlocked" class="stat-number">-</div>
+                        <div>Total Blocked Slots</div>
+                    </div>
+                    <div class="stat-card">
+                        <div id="uniqueDates" class="stat-number">-</div>
+                        <div>Blocked Dates</div>
+                    </div>
+                </div>
+
+                <h2>Blocked Time Slots</h2>
+                <p style="margin-bottom: 20px; color: #ccc;">
+                    Click the × button to delete individual time slots, or "Delete All" to remove all slots for a specific date.
+                </p>
+
+                <div class="loading" id="loading">Loading blocked slots...</div>
+                <div id="blockedSlots" class="blocked-slots"></div>
+            </div>
+
+            <div style="text-align: center; margin-top: 30px;">
+                <button onclick="logout()" class="btn">Logout</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const DATABASE_CONFIG = {
+            host: 'switchyard.proxy.rlwy.net',
+            port: 43926,
+            database: 'railway',
+            user: 'postgres',
+            password: 'GWfQfOzNQOtSMURDXzrEgzGEYYGqILNZ'
+        };
+
+        let blockedSlotsData = [];
+
+        function login() {
+            const password = document.getElementById('password').value;
+            if (password === 'admin123') {
+                document.getElementById('loginForm').style.display = 'none';
+                document.getElementById('adminContent').style.display = 'block';
+                loadBlockedSlots();
+            } else {
+                showLoginError('Invalid password');
+            }
+        }
+
+        function logout() {
+            document.getElementById('loginForm').style.display = 'block';
+            document.getElementById('adminContent').style.display = 'none';
+            document.getElementById('password').value = '';
+            hideLoginError();
+        }
+
+        function showLoginError(message) {
+            const errorDiv = document.getElementById('loginError');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+        }
+
+        function hideLoginError() {
+            document.getElementById('loginError').style.display = 'none';
+        }
+
+        function showMessage(message, isError = false) {
+            const messageDiv = document.getElementById('message');
+            messageDiv.textContent = message;
+            messageDiv.className = isError ? 'message error' : 'message';
+            messageDiv.style.display = 'block';
+            setTimeout(() => {
+                messageDiv.style.display = 'none';
+            }, 3000);
+        }
+
+        async function loadBlockedSlots() {
+            try {
+                document.getElementById('loading').style.display = 'block';
+                document.getElementById('blockedSlots').innerHTML = '';
+
+                // Since we can't directly connect to PostgreSQL from browser,
+                // we'll use a mock data structure for demonstration
+                // In a real implementation, this would call your API
+                
+                // Mock data based on what we saw in the Python tool
+                const mockData = generateMockBlockedSlots();
+                displayBlockedSlots(mockData);
+                
+                document.getElementById('loading').style.display = 'none';
+                showMessage('Note: This is a demonstration interface. For full functionality, use the Python tool provided.');
+                
+            } catch (error) {
+                document.getElementById('loading').style.display = 'none';
+                showMessage('Error loading blocked slots: ' + error.message, true);
+            }
+        }
+
+        function generateMockBlockedSlots() {
+            const slots = [];
+            const startDate = new Date('2025-07-17');
+            const endDate = new Date('2025-10-15');
+            const nightHours = ['00:00', '01:00', '02:00', '03:00', '04:00', '05:00', '06:00', '07:00', '08:00', '09:00', '10:00', '22:00', '23:00'];
+            
+            let id = 1;
+            for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+                const dateStr = d.toISOString().split('T')[0];
+                nightHours.forEach(time => {
+                    slots.push({
+                        id: id++,
+                        date: dateStr,
+                        time: time,
+                        reason: 'MONTHLY NIGHT CLIENT RESERVED'
+                    });
+                });
+            }
+            return slots;
+        }
+
+        function displayBlockedSlots(slots) {
+            blockedSlotsData = slots;
+            
+            // Group by date
+            const groupedSlots = {};
+            slots.forEach(slot => {
+                if (!groupedSlots[slot.date]) {
+                    groupedSlots[slot.date] = [];
+                }
+                groupedSlots[slot.date].push(slot);
+            });
+
+            // Update stats
+            document.getElementById('totalBlocked').textContent = slots.length;
+            document.getElementById('uniqueDates').textContent = Object.keys(groupedSlots).length;
+
+            // Display slots
+            const container = document.getElementById('blockedSlots');
+            container.innerHTML = '';
+
+            if (Object.keys(groupedSlots).length === 0) {
+                container.innerHTML = `
+                    <div style="text-align: center; padding: 40px; color: #666;">
+                        <h3>No blocked slots found</h3>
+                        <p>All time slots are currently available for booking.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            Object.keys(groupedSlots).sort().forEach(date => {
+                const dateGroup = document.createElement('div');
+                dateGroup.className = 'date-group';
+                
+                dateGroup.innerHTML = `
+                    <div class="date-header">
+                        <span>${date}</span>
+                        <button class="btn btn-danger" onclick="deleteAllForDate('${date}')">
+                            Delete All for This Date
+                        </button>
+                    </div>
+                    <div class="time-slots">
+                        ${groupedSlots[date].map(slot => `
+                            <div class="time-slot">
+                                <span>${slot.time}</span>
+                                <button class="delete-btn" onclick="deleteSlot(${slot.id})" title="Delete this time slot">×</button>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+                
+                container.appendChild(dateGroup);
+            });
+        }
+
+        function deleteSlot(slotId) {
+            if (confirm('Delete this time slot?')) {
+                showMessage('Note: This is a demo interface. Use the Python tool for actual deletion.', true);
+                // In real implementation, this would call your API
+                // For demo, we'll just remove from display
+                blockedSlotsData = blockedSlotsData.filter(slot => slot.id !== slotId);
+                displayBlockedSlots(blockedSlotsData);
+            }
+        }
+
+        function deleteAllForDate(date) {
+            if (confirm('Delete ALL time slots for ' + date + '?')) {
+                showMessage('Note: This is a demo interface. Use the Python tool for actual deletion.', true);
+                // In real implementation, this would call your API
+                // For demo, we'll just remove from display
+                blockedSlotsData = blockedSlotsData.filter(slot => slot.date !== date);
+                displayBlockedSlots(blockedSlotsData);
+            }
+        }
+
+        // Handle Enter key in password field
+        document.getElementById('password').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                login();
+            }
+        });
+    </script>
+</body>
+</html>
+
