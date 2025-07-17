@@ -70,7 +70,7 @@ const BookingModal = ({ isOpen, onClose, preSelectedService }) => {
   const fetchAvailability = async () => {
     try {
       console.log('Fetching availability...')
-      const response = await fetch('https://honest-creativity-production.up.railway.app/api/availability')
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000'}/api/availability`)
       if (response.ok) {
         const data = await response.json()
         console.log('Availability data:', data)
@@ -162,7 +162,7 @@ const BookingModal = ({ isOpen, onClose, preSelectedService }) => {
   // Check client verification status
   const checkClientVerification = async (email) => {
     try {
-      const response = await fetch('https://honest-creativity-production.up.railway.app/api/verification/check-client', {
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000'}/api/verification/check-client`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -185,7 +185,7 @@ const BookingModal = ({ isOpen, onClose, preSelectedService }) => {
   const createVerificationSession = async () => {
     setVerificationLoading(true)
     try {
-      const response = await fetch('https://honest-creativity-production.up.railway.app/api/verification/create-session', {
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000'}/api/verification/create-session`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -229,7 +229,7 @@ const BookingModal = ({ isOpen, onClose, preSelectedService }) => {
       }
 
       // Proceed with booking
-      let endpoint = 'https://honest-creativity-production.up.railway.app/api/submit-booking'
+      let endpoint = `${process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000'}/api/submit-booking`
       let data = {
         name: formData.name,
         email: formData.email,
@@ -247,10 +247,10 @@ const BookingModal = ({ isOpen, onClose, preSelectedService }) => {
           project_type: formData.projectType
         }
       } else if (selectedService === 'engineer-request') {
-        endpoint = 'https://honest-creativity-production.up.railway.app/api/submit-booking'
+        endpoint = `${process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000'}/api/submit-booking`
         data.type = 'engineer-request'
       } else if (selectedService === 'mixing') {
-        endpoint = 'https://honest-creativity-production.up.railway.app/api/submit-booking'
+        endpoint = `${process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000'}/api/submit-booking`
         data.type = 'mixing-request'
       }
 
